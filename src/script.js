@@ -3,31 +3,59 @@ import * as Three from 'three'
 import { Camera } from 'three';
 import { GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js'
 import {RGBELoader} from 'three/examples/jsm/loaders/RGBELoader.js';
+import { threeToCannon, ShapeType } from 'three-to-cannon';
 import * as Cannon from 'cannon';
 
 const gltfLoader = new GLTFLoader();
 const rgbeLoader = new RGBELoader();
+
+
+const world = new Cannon.World();
+world.gravity.set(0, -9.82, 0);
+
+const ballBody = new Cannon.Body({mass: 1});
+ballBody.position.set(0,100,0);
+const ballShape = new Cannon.Sphere(2);
+ballBody.addShape(ballShape);
+world.addBody(ballBody);
+
+let tableBody;
+
 let poolTable;
 gltfLoader.load(
     './pool/scene.gltf', (obj) => {
         //ressource loaded;
         poolTable = obj.scene.children[0].children[0].children[0];
+
+        let surfaceMesh = poolTable.children[11];
+
+        const {shape, offset, orientation} = threeToCannon(surfaceMesh, {type: ShapeType.MESH});
+        tableBody = new Cannon.Body({ mass: 0 });
+        tableBody.addShape(shape,offset,orientation);
+        console.log(tableBody);
+        world.addBody(tableBody);
+
+        const ballBody = new Cannon.Body({mass: 1});
+ballBody.position.set(10,10,10);
+const ballShape = new Cannon.Sphere(2);
+ballBody.addShape(ballShape);
+world.addBody(ballBody);
+
+    
         poolTable.castShadow = true;
         //table.scale(0.1,0.1,0.1);
         //table.rotateX(-Math.PI/2);
         scene.add(poolTable)
+        console.log(poolTable);
+    }    )
 
+    rgbeLoader.load('./hdr/hdr.hdr', (envMap) => {
+        envMap.mapping = Three.EquirectangularReflectionMapping
 
-        rgbeLoader.load('./hdr/hdr.hdr', (envMap) => {
-            console.log(poolTable);
-         envMap.mapping = Three.EquirectangularReflectionMapping
-
-         scene.environment = envMap;
-         scene.background = envMap;
-        })
-    }
-)
-
+        scene.environment = envMap;
+        scene.background = envMap;
+        Draw()
+       })
 const scene = new Three.Scene();
 
 //const directionalLight = new Three.DirectionalLight(0xffffff, 5)
@@ -56,10 +84,6 @@ const sizes = {
     width: $(document).width()
 }
 
-
-
-const world = new Cannon.World();
-world.gravity.set(0, -9.82, 0);
 
 //const floorShape = new Cannon.Plane();
 //const floorBody = new Cannon.Body();
@@ -105,7 +129,12 @@ $(document).keyup(function (e) {
     delete keys[e.key];
 });
 
+let normalMaterial = new Three.MeshStandardMaterial();
 
+const sphereGeometry = new Three.SphereGeometry()
+const sphereMesh = new Three.Mesh(sphereGeometry, normalMaterial)
+sphereMesh.castShadow = true
+scene.add(sphereMesh)
 
 
 camera.rotation.reorder('YZX');
@@ -118,12 +147,14 @@ function Draw() {
     let deltaTime = elapsedTime - oldElapsedTime;
     oldElapsedTime = elapsedTime;
     world.step(1 / 60, deltaTime, 3);
-    //ball.position.copy(ballsPhys.position);
-    //ball.quaternion.copy(ballsPhys.quaternion);
+
+    sphereMesh.position.copy(ballBody.position);
+    sphereMesh.quaternion.copy(ballBody.quaternion);
 
     //ballsPhys.velocity = new Cannon.Vec3(1, 0, 0);
 
     uc.Update(deltaTime);
+    //console.log(ballBody.position);
 
     camera.rotation.set(uc.cameraX, uc.cameraY, 0)
     renderer.render(scene, camera);
@@ -261,4 +292,3 @@ class UserControls {
     window.addEventListener("keydown", (e) => uc.onKeyDown(e), false);  //goofy ahh lambda sinon ca marche pas
 window.addEventListener("keyup", (e) => uc.onKeyUp(e), false);
 
-    Draw()
